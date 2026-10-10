@@ -1,5 +1,7 @@
+import {CANON_ABILITIES,CANON_MAGIC,GF_CATALOG} from './catalog.js';
+export {GF_CATALOG} from './catalog.js';
 // Garden 0.1: deterministic, deliberately simplified FFVIII-inspired rules.
-export const STATS = {hp:'HP',str:'Strength',vit:'Vitality',mag:'Magic',spr:'Spirit',spd:'Speed',hit:'Hit',luck:'Luck'};
+export const STATS = {hp:'HP',str:'Strength',vit:'Vitality',mag:'Magic',spr:'Spirit',spd:'Speed',hit:'Hit',luck:'Luck',eva:'Evasion'};
 export const MAGIC = {
  fire:{name:'Fire',element:'Fire',bonus:[200,10,4,10,4,2,1,1]},
  blizzard:{name:'Blizzard',element:'Ice',bonus:[200,10,4,10,4,2,1,1]},
@@ -26,13 +28,18 @@ export const ABILITIES = Object.fromEntries([
  ['magic',{name:'Magic',ap:0,kind:'command'}],['draw',{name:'Draw',ap:0,kind:'command'}],
  ['item',{name:'Item',ap:0,kind:'command'}],['summon',{name:'GF',ap:0,kind:'command'}]
 ]);
+Object.assign(MAGIC,Object.fromEntries(Object.entries(CANON_MAGIC).filter(([id])=>!Object.hasOwn(MAGIC,id))));
+for(const spell of Object.values(MAGIC))if(spell.bonus.length===8)spell.bonus.push(0);
+for(const [id,ability] of Object.entries(CANON_ABILITIES))if(!Object.hasOwn(ABILITIES,id))ABILITIES[id]=ability;
+export function passiveLimit(state){const a=available(state);return a.has('ability_x4')?4:a.has('ability_x3')?3:2;}
 export const ITEMS = {potion:{name:'Potion',heal:200},hi_potion:{name:'Hi-Potion',heal:1000},phoenix:{name:'Phoenix Down',revive:true}};
-export const ELEMENTS = ['Fire','Ice','Thunder','Water','Earth','Wind','Holy','Non-elemental'];
+export const ELEMENTS = ['Fire','Ice','Thunder','Water','Earth','Wind','Holy','Poison','Non-elemental'];
 export const STARTERS = [
  {id:'shiva',name:'Shiva',element:'Ice',description:'The queen of ice.',abilities:['j_hp','j_str','j_vit','vit20','magic','draw','item','summon'],learned:['j_hp','j_str','magic','draw','item','summon']},
  {id:'quezacotl',name:'Quezacotl',element:'Thunder',description:'The guardian of thunder.',abilities:['j_hp','j_mag','j_spr','mag20','magic','draw','item','summon'],learned:['j_hp','j_mag','magic','draw','item','summon']},
  {id:'ifrit',name:'Ifrit',element:'Fire',description:'The lord of flames.',abilities:['j_hp','j_str','j_vit','str20','hp20','magic','draw','item','summon'],learned:['j_hp','j_str','magic','draw','item','summon']}
 ];
+for(const gf of STARTERS)gf.abilities=[...new Set([...gf.abilities,...GF_CATALOG[gf.id].abilities])];
 const clone = x=>structuredClone(x);
 // Retain old saves and event payloads while presenting English catalog labels.
 const LEGACY_ELEMENTS = {'Fuoco':'Fire','Ghiaccio':'Ice','Tuono':'Thunder','Acqua':'Water','Terra':'Earth','Vento':'Wind','Sacro':'Holy','Non elementale':'Non-elemental'};
@@ -53,18 +60,18 @@ export function englishLog(text){
  return text;
 }
 export function englishState(input){
- const state=clone(input);
+ const state=clone(input);state.base.eva??=0;if(Array.isArray(state.party))for(const member of state.party)member.state=englishState(member.state);
  for(const gf of state.gfs){gf.element=elementName(gf.element);if(STARTERS.some(g=>g.id===gf.id)&&Object.hasOwn(LEGACY_DESCRIPTIONS,gf.description))gf.description=LEGACY_DESCRIPTIONS[gf.description];}
  for(const row of state.log)row.text=englishLog(row.text);
  return state;
 }
-export function freshState(){return {version:1,level:1,hp:500,gil:0,base:{hp:500,str:10,vit:10,mag:10,spr:10,spd:10,hit:100,luck:10},magic:{},junction:{},gfs:[],equipped:[],passives:[],commands:['magic','draw','item'],items:{},seenEvents:[],log:[]};}
+export function freshState(){return {version:1,level:1,hp:500,gil:0,base:{hp:500,str:10,vit:10,mag:10,spr:10,spd:10,hit:100,luck:10,eva:0},magic:{},junction:{},gfs:[],equipped:[],passives:[],commands:['magic','draw','item'],items:{},seenEvents:[],log:[]};}
 export function available(state){return new Set(state.gfs.filter(g=>state.equipped.includes(g.id)&&g.acquired).flatMap(g=>g.learned));}
 export function values(state){
  const learned=available(state), result={};
  for(const [i,stat] of Object.keys(STATS).entries()){
   const spell=state.junction[stat];
-  let n=state.base[stat]+(learned.has(`j_${stat}`)&&MAGIC[spell]?Math.floor(MAGIC[spell].bonus[i]*(state.magic[spell]||0)/100):0);
+  let n=(state.base[stat]??0)+(learned.has(`j_${stat}`)&&MAGIC[spell]?Math.floor(MAGIC[spell].bonus[i]*(state.magic[spell]||0)/100):0);
   n=Math.floor(n*(1+state.passives.filter(a=>learned.has(a)&&ABILITIES[a]?.stat===stat).reduce((p,a)=>p+ABILITIES[a].percent,0)/100));
   n+=(state.gear||[]).filter(g=>g.equipped&&g.quantity>0).reduce((sum,g)=>sum+(g.bonuses?.[stat]||0),0);if(stat==='spd'&&state.conditions?.some(c=>c.id==='haste'))n*=2;
   result[stat]=Math.max(stat==='hp'?1:0,Math.min(stat==='hp'?9999:stat==='hit'?255:255,n));
@@ -74,10 +81,10 @@ export function reconcile(state){
  const learned=available(state),used=new Set();
  for(const stat of Object.keys(STATS)){
   const spell=state.junction[stat];
-  if(spell&&(!learned.has(`j_${stat}`)||!MAGIC[spell]||!state.magic[spell]||used.has(spell))) delete state.junction[stat];
+  if(spell&&(MAGIC[spell]?.battleOnly||!learned.has(`j_${stat}`)||!MAGIC[spell]||!state.magic[spell]||used.has(spell))) delete state.junction[stat];
   else if(spell)used.add(spell);
  }
- state.passives=state.passives.filter(a=>learned.has(a)&&ABILITIES[a]?.kind==='passive').slice(0,2);
+ state.passives=state.passives.filter(a=>learned.has(a)&&ABILITIES[a]?.kind==='passive').slice(0,passiveLimit(state));
  state.commands=state.commands.filter(a=>learned.has(a)&&ABILITIES[a]?.kind==='command').slice(0,3);
  state.hp=Math.min(state.hp,values(state).hp);
 }
@@ -85,12 +92,13 @@ export function setJunction(state,stat,spell){
  if(!Object.hasOwn(STATS,stat))throw Error('Unknown stat.');
  if(!spell){delete state.junction[stat];reconcile(state);return;}
  if(!available(state).has(`j_${stat}`))throw Error('No equipped GF has learned this Junction ability.');
+ if(MAGIC[spell]?.battleOnly)throw Error('This spell is battle-only and cannot be Junctioned.');
  if(!MAGIC[spell]||!state.magic[spell])throw Error('Magic unavailable.');
  if(Object.entries(state.junction).some(([key,v])=>key!==stat&&v===spell))throw Error('This magic is already junctioned to another stat.');
  state.junction[stat]=spell;reconcile(state);
 }
 export function equipGF(state,id){
- const gf=state.gfs.find(g=>g.id===id&&g.acquired);if(!gf)throw Error('GF not acquired.');
+ const gf=state.gfs.find(g=>g.id===id&&g.acquired);if(!gf)throw Error('GF not acquired.');if(GF_CATALOG[gf.id]?.summonOnly)throw Error('This special GF cannot be Junctioned.');
  state.equipped=state.equipped.includes(id)?state.equipped.filter(x=>x!==id):[...state.equipped,id];reconcile(state);
 }
 export function addAP(state,amount){
@@ -114,10 +122,12 @@ function word(v,label,max=80){if(typeof v!=='string'||!v.trim()||v.length>max)th
 function list(v,max,label){if(!Array.isArray(v)||v.length>max)throw Error(`Invalid ${label}.`);return v;}
 function id(v){const s=word(v,'ID',64);if(!/^[a-z0-9][a-z0-9_-]*$/i.test(s))throw Error('Invalid ID.');return s;}
 function gfFromEvent(e){
- const abilities=[...new Set(list(e.abilities,12,'Abilities'))];
- if(!abilities.length||abilities.some(a=>!Object.hasOwn(ABILITIES,a)))throw Error('The GF must use abilities from the catalog.');
- const element=elementName(e.element);if(!ELEMENTS.includes(element))throw Error('Unknown element.');
- return {id:id(e.gf),name:word(e.name,'GF name'),element,description:word(e.description,'Description',700),abilities,learned:abilities.filter(a=>ABILITIES[a].ap===0),acquired:false,progress:{},training:null};
+ const canon=Object.hasOwn(GF_CATALOG,e.gf)?GF_CATALOG[e.gf]:null,data={...(canon?clone(canon):{}),...e};
+ const abilities=[...new Set(list(data.abilities,32,'Abilities'))];
+ if((!abilities.length&&!canon?.summonOnly)||abilities.some(a=>!Object.hasOwn(ABILITIES,a)))throw Error('The GF must use abilities from the catalog.');
+ const element=elementName(data.element);if(!ELEMENTS.includes(element))throw Error('Unknown element.');
+ const learned=canon&&e.abilities===undefined?canon.learned:abilities.filter(a=>ABILITIES[a].ap===0);
+ return {id:id(e.gf),name:word(data.name,'GF name'),element,description:word(data.description,'Description',700),abilities,learned:clone(learned),acquired:false,progress:{},training:null};
 }
 export function applyEvent(state,event){
  const e=event;if(!e||typeof e!=='object'||Array.isArray(e))throw Error('Invalid event.');
@@ -152,20 +162,20 @@ export function useItem(state,item){
 export function validateState(input){
  if(!input||input.version!==1)throw Error('Unsupported save format.');
  const s=freshState();s.level=integer(input.level,1,100,'Level');s.gil=integer(input.gil,0,9999999,'Gil');
- for(const stat of Object.keys(STATS))s.base[stat]=integer(input.base?.[stat],stat==='hp'?1:0,stat==='hp'?9999:255,STATS[stat]);
+ for(const stat of Object.keys(STATS))s.base[stat]=integer(input.base?.[stat]??(stat==='eva'?0:undefined),stat==='hp'?1:0,stat==='hp'?9999:255,STATS[stat]);
  s.hp=integer(input.hp,0,9999,'HP');
  for(const key of Object.keys(MAGIC))if(input.magic?.[key]!=null)s.magic[key]=integer(input.magic[key],0,100,'Stock');
  for(const key of Object.keys(ITEMS))if(input.items?.[key]!=null)s.items[key]=integer(input.items[key],0,99,'Item');
  s.gfs=list(input.gfs,100,'GF').map(g=>{
   const n=gfFromEvent({...g,gf:g.id});n.acquired=g.acquired===true;
-  n.learned=[...new Set(list(g.learned,12,'Learned abilities'))];if(n.learned.some(a=>!n.abilities.includes(a)))throw Error('Learned ability unavailable.');
+  n.learned=[...new Set(list(g.learned,32,'Learned abilities'))];if(n.learned.some(a=>!n.abilities.includes(a)))throw Error('Learned ability unavailable.');
   for(const a of n.abilities)if(g.progress?.[a]!=null)n.progress[a]=integer(g.progress[a],0,ABILITIES[a].ap,'AP progress');
   n.training=g.training||null;if(n.training&&(!n.abilities.includes(n.training)||n.learned.includes(n.training)))throw Error('Invalid learning target.');return n;
  });
  if(new Set(s.gfs.map(g=>g.id)).size!==s.gfs.length)throw Error('Duplicate GF IDs.');
- s.equipped=[...new Set(list(input.equipped,100,'Equipped GFs'))];if(s.equipped.some(a=>!s.gfs.some(g=>g.id===a&&g.acquired)))throw Error('Equipped GF has not been acquired.');
+ s.equipped=[...new Set(list(input.equipped,100,'Equipped GFs'))];if(s.equipped.some(a=>!s.gfs.some(g=>g.id===a&&g.acquired&&!GF_CATALOG[g.id]?.summonOnly)))throw Error('Equipped GF has not been acquired.');
  for(const stat of Object.keys(STATS))if(input.junction?.[stat]){if(!Object.hasOwn(MAGIC,input.junction[stat]))throw Error('Unknown Junction.');s.junction[stat]=input.junction[stat];}
- s.passives=[...new Set(list(input.passives,2,'Passives'))];s.commands=[...new Set(list(input.commands,3,'Commands'))];
+ s.passives=[...new Set(list(input.passives,4,'Passives'))];s.commands=[...new Set(list(input.commands,3,'Commands'))];
  if(s.passives.some(a=>ABILITIES[a]?.kind!=='passive')||s.commands.some(a=>ABILITIES[a]?.kind!=='command'))throw Error('Invalid equipped abilities.');
  s.seenEvents=list(input.seenEvents,5000,'Events').map(id);
  s.log=list(input.log,100,'Log').map(l=>({at:word(l.at,'Date'),text:word(l.text,'Log',1000)}));reconcile(s);return englishState(s);
@@ -174,6 +184,7 @@ export function promptFor(state,persona){return `GARDEN — authoritative state 
 You handle narration and non-player characters only. Do not decide the protagonist's actions, thoughts, or Junctions. The user chooses Junctions in the menus. Preserve the language requested for the roleplay; these instructions are in English, but do not force a different narration language. Use the English catalog names for extension data and event values.
 If an actual narrative event changes a resource, append a fenced garden-event block containing JSON (one object or an array). Give each event a new, stable ID using letters, numbers, and hyphens. Do not repeat past events or emit events for hypothetical situations, suggestions, quotations, or summaries.
 Supported types: magic {id,type,magic,amount}, item {id,type,item,amount}, gil/hp/ap {id,type,amount}; amount must be an integer and ap must be positive. The extension applies HP and resource changes. Do not invent combat calculations.
-For an original GF: gf_discover {id,type,gf,name,element,description,abilities}. The gf field is a stable ID; abilities must come from the fixed catalog. Discovery only registers an encounter. Actual acquisition uses gf_acquire {id,type,gf}. Never equip GFs or assign Junctions yourself.
+Canonical GF IDs: ${Object.keys(GF_CATALOG).join(', ')}. For a canonical GF, gf_discover needs only {id,type,gf}; its definition is filled from the built-in catalog. Special invocations cannot be equipped. For an original GF: gf_discover {id,type,gf,name,element,description,abilities}. The gf field is a stable ID; abilities must come from the fixed catalog. Discovery only registers an encounter. Actual acquisition uses gf_acquire {id,type,gf}. Never equip GFs or assign Junctions yourself.
 Magic IDs: ${Object.keys(MAGIC).join(', ')}. Item IDs: ${Object.keys(ITEMS).join(', ')}. GF elements: ${ELEMENTS.join(', ')}. GF abilities: ${Object.entries(ABILITIES).map(([k,v])=>`${k}=${v.name}`).join('; ')}. Zero-AP abilities are initially learned; all others require AP. This version uses simplified FFVIII-inspired Junction rules.
 Example event: \`\`\`garden-event\n{"id":"discovery-001","type":"magic","magic":"fire","amount":10}\n\`\`\`. If nothing changes, do not emit any event blocks.`;}
+

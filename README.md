@@ -133,3 +133,14 @@ Unofficial fan project. Original code is licensed under MIT. Final Fantasy and r
 The layout now follows the reference mockup with navy translucent windows, double silver borders, gold selection states, a wider Junction panel, framed chat messages and a companion roster with HP bars. The interface remains in English. Garden uses your existing SillyTavern background; the background illustration and character artwork in the reference are not bundled.
 
 In **Party**, each companion has **Upload portrait**, **Remove portrait** and an optional HTTPS image link. Upload accepts PNG, JPG and WebP up to 10 MB and resizes them to a maximum dimension of 384 pixels. Uploaded portraits are embedded in the chat save and included in Garden exports, so no internet hosting is required. The protagonist still uses the active SillyTavern Persona avatar. **Remove companion** removes the companion sheet; **Undo** restores it.
+
+
+### v0.3.0 — Compact layout and complete English reference catalog
+
+The pre-mockup desktop panel widths and portrait sizes are restored while retaining the navy and silver styling. The Catalog menu includes 50 stock spell entries (including battle-only Apocalypse), 115 GF ability entries across Junction, command, character, party, GF and menu categories, and 23 GF entries: 16 Junctionable GFs plus Odin, Gilgamesh, Phoenix, Boko, MiniMog, Moomba and the enemy GF Griever. These special entries do not grant character Junction abilities.
+
+Use **Guardian Force → Add a GF from the FFVIII catalog** to register a canonical GF with its ability list. Acquisition and equipment are separate; checking **Already acquired** still does not equip the GF. Legacy GFs can use **Add missing catalog abilities** to add their canonical learning options while preserving learned abilities and AP progress. Existing simplified spell bonuses and AP costs remain compatible with older saves.
+
+Evasion now supports basic stat Junctions, and Ability x3 / x4 expand the available character passive slots. Element/status Junctions, summon modifiers, refinement, and most special battle effects are reference entries for narration rather than fully automated mechanics. Catalog availability does not grant free magic stocks or automatically learned AP abilities.
+
+Catalog fact references: [FFOnline abilities](https://ffonline.com/ff8/abilities), [FFOnline magic](https://ffonline.com/ff8/magic), and [Final Fantasy Wiki magic list](https://finalfantasy.fandom.com/wiki/Magic_(Final_Fantasy_VIII)).
