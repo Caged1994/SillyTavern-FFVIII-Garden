@@ -65,3 +65,14 @@ body.garden-active #chat{background:transparent!important}body.garden-active #ch
 body:not(.garden-active) .garden-technical{display:none}
 #garden-left nav button{padding-top:7px;padding-bottom:7px}
 @media(max-width:1400px){.garden-scene-summary{display:none}}
+
+
+/* Garden 0.2.1: steel blue menu windows and companion portraits. */
+.garden-window{background:linear-gradient(145deg,rgba(55,76,103,.97),rgba(14,28,47,.98));border-color:#d1d7df;border-radius:4px;box-shadow:inset 0 0 0 2px #40546b,inset 0 0 28px #070d1880,0 8px 28px #0009;text-shadow:0 2px 2px #000;font-family:Georgia,'Times New Roman',serif}
+.garden-window h2{background:linear-gradient(90deg,#8593a22e,transparent);border-color:#c1cbd8}
+.garden-window .selected,.garden-window .garden-primary{background:linear-gradient(90deg,#8498b655,#24374a);border-color:#d1dbe8}
+#garden-left nav button.selected{background:linear-gradient(90deg,#879cb355,#203249);border-color:#d1dbe8}
+.garden-companion-heading{display:flex;align-items:center;gap:14px}
+.garden-companion-heading img,.garden-companion-heading .garden-portrait-fallback{width:72px;height:90px;object-fit:cover;object-position:top;border:3px double #bfcbd9;border-radius:3px;flex-shrink:0}
+.garden-window .garden-danger{border-color:#d19a93;color:#ffdad5;background:#542c36}
+body.garden-active #sheld{background:linear-gradient(140deg,#263d57f5,#111e30f5)!important;border-radius:4px!important}

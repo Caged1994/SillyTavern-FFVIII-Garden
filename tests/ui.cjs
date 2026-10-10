@@ -39,6 +39,12 @@ const {JSDOM}=require('jsdom');const fs=require('node:fs');const path=require('n
  const node=d.createElement('div');node.className='mes';node.setAttribute('mesid',w.context.chat.length-1);node.innerHTML='<div class="mes_block"><div class="mes_text"><pre><code class="language-garden-event"></code></pre></div></div>';node.querySelector('code').textContent='{"id":"later","type":"gil","amount":15}';d.querySelector('#chat').append(node);const original=w.context.chat.at(-1).mes;await click('[data-tab="events"]');assert(node.querySelector('.garden-technical'));assert(node.querySelector('pre.garden-event-source'));assert.equal(w.context.chat.at(-1).mes,original);
  for(const tab of ['party','quests','scene'])await click('[data-tab="'+tab+'"]');
  w.context.name1='<img src=x onerror=alert(1)>';await w.emit('persona');assert.equal(d.querySelector('#garden-left h3 img'),null);assert.equal(d.querySelector('#garden-left h3').textContent,w.context.name1);
+ await click('[data-tab="party"]');
+ d.querySelector('[data-form="portrait"] [name="portrait"]').value='https://example.com/zell.png';submit('[data-form="portrait"]');await waitFor(()=>profile().state.party[0].portrait==='https://example.com/zell.png');await new Promise(r=>setTimeout(r,10));
+ d.querySelector('select[data-member]').value='zell';d.querySelector('select[data-member]').dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(d.querySelector('#garden-left h3').textContent,'Zell');assert.equal(d.querySelector('#garden-left .garden-profile img').src,'https://example.com/zell.png');
+ await click('[data-action="remove-member"]');await waitFor(()=>profile().state.party.length===0);assert.equal(d.querySelector('select[data-member]').value,'protagonist');
+ await click('[data-action="undo"]');await waitFor(()=>profile().state.party.length===1);assert.equal(profile().state.party[0].portrait,'https://example.com/zell.png');
  await click('[data-action="disable"]');assert.equal(d.body.classList.contains('garden-active'),false);assert.equal(d.querySelector('#garden-bar').hidden,true);assert.equal(w.prompts.ff8_garden_v1,'');
  assert(!w.notices.some(t=>t.startsWith('ERROR:')&&!t.includes('Unknown magic')));console.log('PASS DOM: Junction apply/preview/cancel, AP, Persona avatar isolation, events, deduplication, undo, failed generation, atomic rejection, save, escaping, disable, party, missions, swipe/edit/delete restoration and manual edit protection.');dom.window.close();fs.rmSync(temp,{recursive:true,force:true});
 })().catch(e=>{console.error(e);process.exitCode=1;});
+

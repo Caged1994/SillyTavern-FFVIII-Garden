@@ -7,6 +7,25 @@ export const CONDITIONS={poison:'Poison',sleep:'Sleep',silence:'Silence',protect
 export const PERMISSIONS=['hp','resources','gf','progress','quests','conditions','equipment','memories','scene','party'];
 export function character(s){s.xp??=0;s.conditions??=[];s.gear??=[];return s;}
 export function campaign(input){const s=character(copy(input));s.party??=[];s.quests??=[];s.memories??=[];s.scene??={location:'Unknown',time:'Unknown',day:1,present:[],mission:''};return s;}
+export function portraitURL(value='') {
+ if(typeof value!=='string'||value.length>2048)throw Error('Invalid portrait URL.');
+ const url=value.trim();if(!url)return '';
+ let parsed;try{parsed=new URL(url);}catch{throw Error('Use an absolute HTTPS portrait URL.');}
+ if(parsed.protocol!=='https:'||parsed.username||parsed.password)throw Error('Use an HTTPS portrait URL without credentials.');
+ return parsed.href;
+}
+export function removeMember(input,id){
+ const s=campaign(input),member=s.party.find(m=>m.id===id);
+ if(!member)throw Error('Unknown party member.');
+ s.party=s.party.filter(m=>m.id!==id);
+ if(!s.party.some(m=>m.name===member.name))s.scene.present=s.scene.present.filter(name=>name!==member.name);
+ return s;
+}
+export function setPortrait(input,id,url){
+ const s=campaign(input),member=s.party.find(m=>m.id===id);
+ if(!member)throw Error('Unknown party member.');
+ member.portrait=portraitURL(url);return s;
+}
 export function sheet(s,target='protagonist'){if(target==='protagonist')return s;const member=s.party.find(m=>m.id===target);if(!member)throw Error('Unknown party member.');return member.state;}
 export function effective(s){return values(s);}
 export function awardXP(s,amount){num(amount,1,999999);character(s);s.xp=Math.min(99000,s.xp+amount);const level=Math.min(100,1+Math.floor(s.xp/1000));while(s.level<level){s.level++;s.base.hp=Math.min(9999,s.base.hp+30);for(const k of ['str','vit','mag','spr'])s.base[k]=Math.min(255,s.base[k]+1);}reconcile(s);}
@@ -32,7 +51,7 @@ export function applyCampaignEvent(input,e,permissions=null){
 export function validateCampaign(input){
  const s=campaign(validateState(input));
  function extras(dst,src){dst.xp=num(src.xp??0,0,99000);if(!Array.isArray(src.conditions??[])||(src.conditions||[]).length>6)throw Error('Invalid conditions.');dst.conditions=(src.conditions||[]).map(c=>{if(!Object.hasOwn(CONDITIONS,c.id))throw Error('Unknown condition.');return {id:c.id,turns:num(c.turns,1,999)};});if(!Array.isArray(src.gear??[])||(src.gear||[]).length>100)throw Error('Invalid equipment.');dst.gear=(src.gear||[]).map(g=>gear({...g,gear:g.id}));dst.hp=Math.min(src.hp,effective(dst).hp);if(new Set(dst.gear.map(g=>g.id)).size!==dst.gear.length||new Set(dst.conditions.map(c=>c.id)).size!==dst.conditions.length)throw Error('Duplicate equipment or conditions.');}
- extras(s,input);if(!Array.isArray(input.party??[])||(input.party||[]).length>12)throw Error('Invalid party.');s.party=(input.party||[]).map(m=>{const c=validateState(m.state);extras(c,m.state);return {id:ident(m.id),name:text(m.name,80),state:c};});if(new Set(s.party.map(m=>m.id)).size!==s.party.length||s.party.some(m=>m.id==='protagonist'))throw Error('Invalid party IDs.');
+ extras(s,input);if(!Array.isArray(input.party??[])||(input.party||[]).length>12)throw Error('Invalid party.');s.party=(input.party||[]).map(m=>{const c=validateState(m.state);extras(c,m.state);return {id:ident(m.id),name:text(m.name,80),...(m.portrait!==undefined?{portrait:portraitURL(m.portrait)}:{}),state:c};});if(new Set(s.party.map(m=>m.id)).size!==s.party.length||s.party.some(m=>m.id==='protagonist'))throw Error('Invalid party IDs.');
  if(!Array.isArray(input.quests??[])||(input.quests||[]).length>100||!Array.isArray(input.memories??[])||(input.memories||[]).length>100)throw Error('Invalid campaign lists.');
  s.quests=(input.quests||[]).map(q=>{const result=applyCampaignEvent(campaign(freshState()),{...q,quest:q.id,id:'import-q',type:'quest'}).state.quests[0];result.completed=q.completed===true;if(result.completed)result.progress=100;return result;});
  s.memories=(input.memories||[]).map(m=>applyCampaignEvent(campaign(freshState()),{...m,memory:m.id,id:'import-m',type:'memory'}).state.memories[0]);
@@ -51,3 +70,4 @@ export function reverseChanges(current,before,after){
  const result=copy(current);for(const key of new Set([...Object.keys(before),...Object.keys(after)])){if(JSON.stringify(before[key])===JSON.stringify(after[key]))continue;if(JSON.stringify(current[key])===JSON.stringify(after[key])){if(before[key]===undefined)delete result[key];else result[key]=copy(before[key]);}else if(current[key]&&before[key]&&after[key]&&typeof current[key]==='object')result[key]=reverseChanges(current[key],before[key],after[key]);}return result;
 }
 export function campaignPrompt(s){return `\nGARDEN CAMPAIGN: ${JSON.stringify({party:s.party.map(m=>({id:m.id,name:m.name,level:m.state.level,xp:m.state.xp,hp:m.state.hp,stats:effective(m.state),magic:m.state.magic,junction:m.state.junction,gfs:m.state.gfs,equipped:m.state.equipped,conditions:m.state.conditions,items:m.state.items,gear:m.state.gear})),quests:s.quests,scene:s.scene,conditions:s.conditions,equipment:s.gear,xp:s.xp,memories:s.memories.filter(m=>m.important||s.scene.present.includes(m.npc)).slice(-20)})}\nAdditional events (unique id required): party {member,name}; xp {amount,target}; condition {condition,turns,target} (0 removes); tick {turns,target} only when turns actually pass; equipment {gear,name,kind,quantity,bonuses} registers backpack items, never equip them; quest {quest,title,kind,progress,reward:{xp,gil,ap}}; quest_complete {quest} rewards once; memory {memory,npc,text,important}; scene {location,time,day,present:[names],mission}. Add type and id to each object. Optional target is protagonist or a party ID. XP: 1000 per level; +30 base HP and +1 STR/VIT/MAG/SPR per level, cap100. Poison deals 1/16 maximum HP per tick; Haste doubles effective Speed. Sleep/Silence prevent corresponding narrative actions; Protect/Shell are descriptive damage guards, not automatic combat damage calculators. Never change Junctions, equipped GF, passive abilities or equipment loadout. User manages those. GF AP stays separate from character XP.`;}
+

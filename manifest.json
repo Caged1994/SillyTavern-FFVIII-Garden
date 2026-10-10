@@ -6,9 +6,10 @@
   "js": "index.js",
   "css": "style.css",
   "author": "Mr OMG & Codex",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "minimum_client_version": "1.19.0",
   "auto_update": false,
   "generate_interceptor": "ff8GardenIntercept",
   "homePage": "https://github.com/Caged1994/SillyTavern-FFVIII-Garden"
 }
+
