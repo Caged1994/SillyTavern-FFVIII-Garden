@@ -1,98 +1,101 @@
-# FFVIII • Garden — 0.1.0
+# FFVIII • Garden — 0.1.1
 
-Estensione UI per SillyTavern: menu blu con bordi argentati, protagonista letto dalla Persona attiva, GF, magie, Junction, inventario e registro degli eventi. La chat centrale è la chat originale di SillyTavern.
+A SillyTavern UI extension with blue menus and silver borders, the active Persona as protagonist, Guardian Forces, magic stocks, manual Junctions, inventory, and an event log. The center panel remains SillyTavern's native chat.
 
-## Installazione da GitHub
+Version 0.1.1 uses English throughout the interface, catalog, notifications, validation messages, documentation, and AI instructions. Existing v0.1 save files remain compatible. The extension does not override your roleplay language or translate your Persona, original GF names, or custom descriptions.
 
-1. Apri **Estensioni → Install Extension** in SillyTavern.
-2. Incolla `https://github.com/Caged1994/SillyTavern-FFVIII-Garden`.
-3. Conferma e ricarica la pagina.
-4. Apri una chat e scegli la Persona, poi premi **Carica kit di prova** per verificare i menu.
+## Install from GitHub
 
-Per aggiornare il codice usa il comando di aggiornamento in **Gestisci estensioni**.
+1. Open **Extensions → Install Extension** in SillyTavern.
+2. Paste `https://github.com/Caged1994/SillyTavern-FFVIII-Garden.git`.
+3. Confirm, then reload the page.
+4. Open a chat, select your Persona, and press **Load test kit** to try the menus.
 
-## Installazione del pacchetto ZIP su Windows
+For updates, use the update control in **Manage Extensions**, then refresh with **Ctrl+F5**. You do not need to reinstall or reset your chat data.
 
-1. Chiudi SillyTavern.
-2. Estrai lo ZIP. Troverai la cartella `ff8-garden`.
-3. Apri la cartella in cui è installato SillyTavern (quella che contiene `Start.bat` e `public`).
-4. Copia `ff8-garden` dentro `public\scripts\extensions\third-party`. Crea `third-party` se non esiste.
-5. Controlla che il percorso finale sia `SillyTavern\public\scripts\extensions\third-party\ff8-garden\manifest.json`. Evita una doppia cartella `ff8-garden\ff8-garden`.
-6. Avvia SillyTavern e ricarica la pagina con **Ctrl+F5**.
-7. In **Estensioni**, apri **FFVIII • Garden** e verifica che **Attiva layout Garden** sia selezionato. Se non compare, controlla in Gestisci estensioni che non sia disabilitata.
-8. Apri una chat e scegli una Persona.
+## Manual installation on Windows
 
-È una normale estensione frontend, senza plugin server, Extras, nuove API key o installazione di pacchetti. La copia manuale la rende disponibile a tutti gli utenti di questa installazione. I file dell’estensione si trovano nella radice del repository, come richiesto dall’installazione tramite URL.
+1. Close SillyTavern and extract the extension files into a folder named `ff8-garden`.
+2. Open your SillyTavern installation folder, which contains `Start.bat` and `public`.
+3. Place `ff8-garden` in `public\scripts\extensions\third-party`. Create `third-party` if needed.
+4. The final path must be `SillyTavern\public\scripts\extensions\third-party\ff8-garden\manifest.json`, without a second nested extension folder.
+5. Restart SillyTavern and refresh with **Ctrl+F5**.
+6. Under **Extensions → FFVIII • Garden**, enable **Enable Garden layout**. Check Manage Extensions if the extension does not appear.
+7. Open a chat and select a Persona.
 
-## Prima prova — circa due minuti
+This is a frontend extension. No server plugin, Extras server, new API key, or dependency installation is required. Manual installation under `public` makes it available to all users of that installation.
 
-1. Apri una chat di prova e seleziona la Persona che vuoi usare come protagonista.
-2. Premi **Carica kit di prova**: vengono aggiunti Shiva, Quezacotl, 80 unità di Fire/Blizzard/Thunder/Cura e almeno 5 Pozioni. Il kit è una funzione di prova esplicita, non una ricompensa narrativa.
-3. Vai in **Junction**, seleziona **Forza**, scegli **Fire** e premi **Applica Junction**. La statistica passa da 10 a 18.
-4. Associa **Cura** agli **HP**: il massimo passa da 500 a 980. Gli HP attuali non vengono curati automaticamente.
-5. Vai in **Guardian Force**, seleziona **Resistenza-J** come apprendimento di Shiva. Assegna 100 AP: ora la Junction a Resistenza è disponibile.
-6. Cambia Persona: il nome e il ritratto cambiano e le risorse dell'altra Persona restano separate. Tornando alla prima ritrovi i suoi dati.
-7. Ricarica la pagina: le modifiche vengono conservate nei metadati della chat.
+## First test
 
-## Narrazione e nuovi GF
+1. Open a test chat and select your protagonist's Persona.
+2. Press **Load test kit**. This adds Shiva, Quezacotl, 80 units each of Fire, Blizzard, Thunder, and Cure, and at least 5 Potions. The kit is an explicit testing feature, not a narrative reward.
+3. In **Junction**, select **Strength**, choose **Fire**, and press **Apply Junction**. Strength increases from 10 to 18.
+4. Junction **Cure** to **HP**: maximum HP increases from 500 to 980. Current HP is not automatically healed.
+5. In **Guardian Force**, select **Vitality-J** as Shiva's learning target. Award 100 AP to unlock the Vitality Junction.
+6. Switch Persona. Its name, portrait, and resources are separate. Return to the first Persona to restore its displayed state.
+7. Reload the page. Changes are saved in the chat metadata.
 
-Se **Condividi stato e protocollo con l’IA** è attivo, l’estensione aggiunge alle normali richieste uno stato aggiornato e le istruzioni per gli eventi. Continua a usare il tuo modello e collegamento attuali. Non viene fatta una seconda chiamata API.
+## Narration and original GFs
 
-L’IA descrive gli eventi e può emettere blocchi `garden-event`. L’estensione valida numeri, risorse e abilità. Un nuovo GF può avere nome, descrizione ed elemento originali, ma tutte le abilità provengono dal catalogo fisso. L’incontro non equivale all’acquisizione; anche dopo l’acquisizione, equipaggiamento e Junction spettano all’utente.
+When **Share state and protocol with the AI** is enabled, Garden adds the current state and event instructions to your normal generation request. Your existing model and connection are used; no additional API request is made.
 
-Esempio di risposta compatibile:
+The AI narrates and can emit `garden-event` blocks. Garden validates quantities, resources, and abilities. Original GFs can have custom names, descriptions, and elements, but their abilities come from a fixed catalog. An encounter does not grant ownership. Even after acquisition, equipping GFs and choosing Junctions remain the user's decisions.
+
+Example compatible response:
 
 ````text
-Dal soffitto della biblioteca scende Vesper, un GF simile a una falena argentata. Per ora si limita a osservarti.
+Vesper, a silver moth-like GF, descends from the library ceiling. For now, it simply watches you.
 
 ```garden-event
-{"id":"vesper-incontro-001","type":"gf_discover","gf":"vesper","name":"Vesper","description":"Una falena argentata che custodisce i sogni.","element":"Non elementale","abilities":["j_hp","j_mag","j_spr","mag20","magic","draw","item","summon"]}
+{"id":"vesper-encounter-001","type":"gf_discover","gf":"vesper","name":"Vesper","description":"A silver moth that guards dreams.","element":"Non-elemental","abilities":["j_hp","j_mag","j_spr","mag20","magic","draw","item","summon"]}
 ```
 ````
 
-Per acquisirlo successivamente:
+Later acquisition:
 
 ````text
 ```garden-event
-{"id":"vesper-patto-002","type":"gf_acquire","gf":"vesper"}
+{"id":"vesper-pact-002","type":"gf_acquire","gf":"vesper"}
 ```
 ````
 
-Sono supportati anche eventi `magic`, `item`, `gil`, `hp`, `ap`. Gli ID unici impediscono di riapplicare lo stesso evento. Un blocco non valido non viene applicato e viene segnalato; un gruppo di eventi viene applicato solo se tutti sono validi.
+Also supported: `magic`, `item`, `gil`, `hp`, and `ap` events. Unique event IDs prevent duplicate application. Invalid events are rejected with a message. A batch is only applied if every new event is valid.
 
-**Applica eventi IA a fine risposta** è attivo inizialmente. Disattivalo nelle impostazioni se preferisci leggere la risposta e premere **Leggi eventi dell’ultima risposta**. I blocchi rimangono visibili nella chat in questa versione. Il modello potrebbe non rispettare il protocollo: resta possibile modificare risorse e aggiungere GF tramite i menu.
+**Apply AI events after each response** is enabled initially. Disable it if you prefer to inspect a response and press **Read latest response events** yourself. Event blocks remain visible in chat in this version. If your model ignores the protocol, you can still update resources and register GFs through the menus.
 
-## Regole implementate
+## Implemented rules
 
-- Scorte di magie 0–100; una magia può essere associata a una sola statistica.
-- Junction consentite solo per abilità apprese di GF acquisiti ed equipaggiati.
-- Apprendimento di un’abilità per GF; gli AP si applicano a tutti i GF equipaggiati che hanno un apprendimento selezionato. Gli AP in eccesso non passano a un'altra abilità.
-- Fino a 3 comandi oltre ad Attacco e 2 passive; bonus HP/Forza/Magia/Resistenza +20%.
-- Pozioni, Granpozioni e Code di fenice con consumo e recupero deterministici.
-- Export/import JSON per la Persona nella chat corrente; annullamento delle ultime 12 operazioni, incluso un gruppo di eventi IA.
-- Risorse vuote iniziali; statistiche base configurabili, livello 1–100.
+- Magic stock: 0–100 per spell. Each spell can be junctioned to one stat.
+- Junctions require a learned ability from an acquired, equipped GF.
+- One learning target per GF. AP goes to every equipped GF with a selected target. Excess AP does not carry over to another ability.
+- Up to 3 commands in addition to Attack and 2 passive abilities. HP, Strength, Magic, and Vitality +20% bonuses are supported.
+- Potions, Hi-Potions, and Phoenix Downs have deterministic consumption and healing effects.
+- JSON import/export for the current chat and Persona. Undo the last 12 operations, including AI event batches.
+- Initially empty resources, configurable base stats, and level 1–100.
 
-Le formule della v0.1 sono **ispirate a FFVIII, semplificate**, non una replica esatta del gioco. La formula è `base + floor(bonus della magia a 100 unità × scorta / 100)`, poi bonus passivi; tetto 9999 HP e 255 per le altre statistiche. Le quantità consumate riducono i bonus; quando una scorta arriva a zero la Junction viene rimossa. Cambiare GF può eliminare Junction non più consentite. Il livello è modificabile e non cambia automaticamente le statistiche.
+These are **simplified FFVIII-inspired rules**, not an exact recreation of the original game. The Junction formula is `base + floor(magic bonus at 100 units × stock / 100)`, followed by passive bonuses. Caps: 9999 HP and 255 for other stats. Consuming magic reduces its bonus; reaching zero stock clears that Junction. Unequipping a GF clears Junctions that are no longer supported. Changing level does not automatically change base stats.
 
-## Limiti della prima versione
+## Current limits
 
-Non include ancora un motore di combattimento, ATB, nemici, danni calcolati, Limit Break, animazioni, squadra NPC, Junction elementali/status, Triple Triad, raffinazione o l'intero catalogo del gioco. Gli eventi HP emessi dall’IA sono conseguenze narrative, non risultati di un combattimento simulato. Non usare ancora questa versione come motore di battaglia.
+There is no combat engine, ATB, enemy system, calculated battle damage, Limit Breaks, animations, NPC party management, elemental/status Junctions, Triple Triad, refinement, or complete game catalog yet. AI HP events represent narrative consequences rather than a simulated combat result.
 
-Il layout è pensato per PC da 1366 px in su. Sotto 1050 px il pannello sinistro viene nascosto; il supporto telefono completo non fa parte di questa versione. Il mockup iniziale era una proposta artistica: qui trovi pannelli reali nello stesso linguaggio visivo, il ritratto della tua Persona e lo sfondo già scelto in SillyTavern, senza ritratti FFVIII o sfondi artistici incorporati.
+The layout targets desktop screens at least 1366 pixels wide. The left panel hides below 1050 pixels. Full mobile support is not included. Garden uses your Persona portrait and current SillyTavern background, with interactive panels inspired by the initial mockup; FFVIII artwork is not bundled.
 
-Se rigeneri, modifichi o cancelli una risposta dopo che i suoi eventi sono stati applicati, i dati già salvati **non vengono riavvolti automaticamente**. Usa **Annulla** prima di scegliere una nuova versione, oppure correggi le risorse. Le modifiche fuori da Garden non aggiornano automaticamente il suo stato. I salvataggi appartengono alla chat, quindi eliminando la chat elimini anche quei dati; esporta prima se vuoi conservarli.
+Regenerating, editing, or deleting a response **does not automatically roll back events that were already applied**. Use **Undo** before choosing an alternative response, or correct the resources manually. Changes outside Garden do not automatically update its state. Deleting a chat deletes its associated save data; export first if you want to keep it.
 
-## Disattivazione e rimozione
+Legacy Italian element values are accepted on import and in old event payloads, then displayed in English. Built-in GF descriptions and known extension-generated historical log labels are translated on display/export. Custom content is preserved.
 
-**Chiudi** nella barra in alto ripristina il layout originale. Per riaprire Garden, attivalo nelle impostazioni delle Estensioni. Puoi spegnere il collegamento narrativo indipendentemente dal layout. Per rimuovere la copia manuale: chiudi SillyTavern, rimuovi solo `public\scripts\extensions\third-party\ff8-garden` e riavvia. I metadati nelle chat vengono conservati.
+## Disable or remove
 
-## Verifica e riferimenti
+Press **Close** in the top bar to restore the original layout. Re-enable Garden in Extensions to reopen it. The AI bridge can be disabled separately. To remove a manual installation, close SillyTavern, remove only the extension folder under `public\scripts\extensions\third-party`, and restart. Chat metadata is retained.
 
-Implementazione verificata contro il codice pubblico del commit `06bde939f` indicato nello screenshot (SillyTavern 1.19.0). API: `SillyTavern.getContext()`, `chatMetadata`, `saveMetadata()`, `extensionSettings`, `setExtensionPrompt()` e gli eventi di chat/Persona/generazione. Solo l'identità e l'avatar della Persona sono letti dal modulo `scripts/personas.js`; se quel modulo non fosse disponibile si usa il nome come identificatore di ripiego (due Persone omonime non sarebbero distinguibili).
+## Validation and references
 
-- Documentazione ufficiale: https://docs.sillytavern.app/for-contributors/writing-extensions/
-- Codice della versione: https://github.com/SillyTavern/SillyTavern/tree/06bde939f
+The integration was checked against SillyTavern 1.19.0 source commit `06bde939f`. APIs: `SillyTavern.getContext()`, `chatMetadata`, `saveMetadata()`, `extensionSettings`, `setExtensionPrompt()`, and chat/Persona/generation events. Persona identity and portrait use `scripts/personas.js`; if unavailable, the fallback uses the display name and cannot distinguish two Personas with the same name.
 
-Test del motore: `npm test` (solo Node, senza dipendenze), 8 test superati. Interazioni dei menu verificate anche tramite DOM con API SillyTavern simulate: Junction, AP, cambio Persona, salvataggi, eventi, duplicati, annullamento e disattivazione. Non è stato possibile eseguire la verifica grafica in un browser in questo ambiente. Rimane da confermare il layout e il funzionamento sulla tua installazione reale, comprese le altre estensioni e il tuo modello online.
+- Official extension documentation: https://docs.sillytavern.app/for-contributors/writing-extensions/
+- SillyTavern source: https://github.com/SillyTavern/SillyTavern/tree/06bde939f
 
-Progetto fan non ufficiale. Codice originale sotto licenza MIT; Final Fantasy e i relativi nomi appartengono ai rispettivi titolari.
+Run `npm test` with Node; no dependencies are required. Engine tests and menu interactions with simulated SillyTavern APIs cover Junctions, AP, Persona separation, persistence, events, duplicates, undo, migration, and disabling. Full browser visual verification was unavailable in the development environment. Compatibility with your installed themes, extensions, and online model still requires a real installation test.
+
+Unofficial fan project. Original code is licensed under MIT. Final Fantasy and related names belong to their respective rights holders.
