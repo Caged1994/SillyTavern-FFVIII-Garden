@@ -66,7 +66,8 @@ export function values(state){
   const spell=state.junction[stat];
   let n=state.base[stat]+(learned.has(`j_${stat}`)&&MAGIC[spell]?Math.floor(MAGIC[spell].bonus[i]*(state.magic[spell]||0)/100):0);
   n=Math.floor(n*(1+state.passives.filter(a=>learned.has(a)&&ABILITIES[a]?.stat===stat).reduce((p,a)=>p+ABILITIES[a].percent,0)/100));
-  result[stat]=Math.min(stat==='hp'?9999:stat==='hit'?255:255,n);
+  n+=(state.gear||[]).filter(g=>g.equipped&&g.quantity>0).reduce((sum,g)=>sum+(g.bonuses?.[stat]||0),0);if(stat==='spd'&&state.conditions?.some(c=>c.id==='haste'))n*=2;
+  result[stat]=Math.max(stat==='hp'?1:0,Math.min(stat==='hp'?9999:stat==='hit'?255:255,n));
  }return result;
 }
 export function reconcile(state){

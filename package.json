@@ -1,9 +1,13 @@
 {
   "name": "ff8-garden",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "test:ui": "node tests/ui.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
   }
 }

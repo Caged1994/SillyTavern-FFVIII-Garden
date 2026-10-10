@@ -6,7 +6,7 @@
   "js": "index.js",
   "css": "style.css",
   "author": "Mr OMG & Codex",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "minimum_client_version": "1.19.0",
   "auto_update": false,
   "generate_interceptor": "ff8GardenIntercept",
