@@ -42,6 +42,18 @@ const {JSDOM}=require('jsdom');const fs=require('node:fs');const path=require('n
  await click('[data-tab="party"]');
  d.querySelector('[data-form="portrait"] [name="portrait"]').value='https://example.com/zell.png';submit('[data-form="portrait"]');await waitFor(()=>profile().state.party[0].portrait==='https://example.com/zell.png');await new Promise(r=>setTimeout(r,10));
  d.querySelector('select[data-member]').value='zell';d.querySelector('select[data-member]').dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(d.querySelector('#garden-left h3').textContent,'Zell');assert.equal(d.querySelector('#garden-left .garden-profile img').src,'https://example.com/zell.png');
+ // Exercise the PC file picker through resize/encode and persisted portrait.
+ const oldClick=w.HTMLInputElement.prototype.click;let picker;
+ w.HTMLInputElement.prototype.click=function(){if(this.type==='file')picker=this;else oldClick.call(this);};
+ const oldImage=global.Image;global.Image=class{constructor(){this.naturalWidth=800;this.naturalHeight=600;}async decode(){}};
+ const oldContext=w.HTMLCanvasElement.prototype.getContext,oldData=w.HTMLCanvasElement.prototype.toDataURL;
+ w.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},drawImage(){}});w.HTMLCanvasElement.prototype.toDataURL=function(type){assert.equal(this.width,384);assert.equal(this.height,288);assert.equal(type,'image/jpeg');return 'data:image/jpeg;base64,/9j/AA==';};
+ w.URL.createObjectURL=()=> 'blob:portrait-test';w.URL.revokeObjectURL=()=>{};
+ await click('[data-action="upload-portrait"]');assert(picker);Object.defineProperty(picker,'files',{value:[new w.File(['image'],'portrait.png',{type:'image/png'})]});picker.onchange();await waitFor(()=>profile().state.party[0].portrait==='data:image/jpeg;base64,/9j/AA==');await new Promise(r=>setTimeout(r,10));
+ assert.equal(d.querySelector('#garden-left .garden-profile img').src,'data:image/jpeg;base64,/9j/AA==');
+ await click('[data-action="clear-portrait"]');await waitFor(()=>profile().state.party[0].portrait==='');
+ w.HTMLInputElement.prototype.click=oldClick;global.Image=oldImage;w.HTMLCanvasElement.prototype.getContext=oldContext;w.HTMLCanvasElement.prototype.toDataURL=oldData;
+ await new Promise(r=>setTimeout(r,10));d.querySelector('[data-form="portrait"] [name="portrait"]').value='https://example.com/zell.png';submit('[data-form="portrait"]');await waitFor(()=>profile().state.party[0].portrait==='https://example.com/zell.png');await new Promise(r=>setTimeout(r,10));
  await click('[data-action="remove-member"]');await waitFor(()=>profile().state.party.length===0);assert.equal(d.querySelector('select[data-member]').value,'protagonist');
  await click('[data-action="undo"]');await waitFor(()=>profile().state.party.length===1);assert.equal(profile().state.party[0].portrait,'https://example.com/zell.png');
  await click('[data-action="disable"]');assert.equal(d.body.classList.contains('garden-active'),false);assert.equal(d.querySelector('#garden-bar').hidden,true);assert.equal(w.prompts.ff8_garden_v1,'');

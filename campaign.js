@@ -8,8 +8,10 @@ export const PERMISSIONS=['hp','resources','gf','progress','quests','conditions'
 export function character(s){s.xp??=0;s.conditions??=[];s.gear??=[];return s;}
 export function campaign(input){const s=character(copy(input));s.party??=[];s.quests??=[];s.memories??=[];s.scene??={location:'Unknown',time:'Unknown',day:1,present:[],mission:''};return s;}
 export function portraitURL(value='') {
- if(typeof value!=='string'||value.length>2048)throw Error('Invalid portrait URL.');
+ if(typeof value!=='string'||value.length>180000)throw Error('Invalid portrait URL.');
  const url=value.trim();if(!url)return '';
+ if(/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(url))return url;
+ if(url.length>2048)throw Error('Portrait link is too long.');
  let parsed;try{parsed=new URL(url);}catch{throw Error('Use an absolute HTTPS portrait URL.');}
  if(parsed.protocol!=='https:'||parsed.username||parsed.password)throw Error('Use an HTTPS portrait URL without credentials.');
  return parsed.href;

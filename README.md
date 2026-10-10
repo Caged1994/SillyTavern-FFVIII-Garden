@@ -126,3 +126,10 @@ The integration was checked against SillyTavern 1.19.0 source commit `06bde939f`
 Run `npm test` with Node; engine tests require no dependencies. For the menu integration suite, run `npm ci` followed by `npm run test:ui` (jsdom is a development dependency only; installation in SillyTavern needs no npm packages). Engine tests and menu interactions with simulated SillyTavern APIs cover Junctions, AP, Persona separation, persistence, events, duplicates, undo, migration, party resources, mission rewards, conditions, equipment, permissions, response restoration and disabling. Full browser visual verification was unavailable in the development environment. Compatibility with your installed themes, extensions, and online model still requires a real installation test.
 
 Unofficial fan project. Original code is licensed under MIT. Final Fantasy and related names belong to their respective rights holders.
+
+
+### v0.2.2 — Reference menu skin and PC portraits
+
+The layout now follows the reference mockup with navy translucent windows, double silver borders, gold selection states, a wider Junction panel, framed chat messages and a companion roster with HP bars. The interface remains in English. Garden uses your existing SillyTavern background; the background illustration and character artwork in the reference are not bundled.
+
+In **Party**, each companion has **Upload portrait**, **Remove portrait** and an optional HTTPS image link. Upload accepts PNG, JPG and WebP up to 10 MB and resizes them to a maximum dimension of 384 pixels. Uploaded portraits are embedded in the chat save and included in Garden exports, so no internet hosting is required. The protagonist still uses the active SillyTavern Persona avatar. **Remove companion** removes the companion sheet; **Undo** restores it.

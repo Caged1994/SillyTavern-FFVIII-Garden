@@ -16,3 +16,11 @@ test('Removal preserves protagonist resources, other companions and original und
  s.scene.present=['Zell','Selphie'];s.gil=50;
  const next=removeMember(s,'zell');assert.equal(next.gil,50);assert.deepEqual(next.party.map(m=>m.id),['selphie']);assert.deepEqual(next.scene.present,['Selphie']);assert.equal(s.party.length,2);assert.throws(()=>removeMember(s,'protagonist'));
 });
+
+test('Uploaded raster portraits survive save import; SVG and oversized data are rejected',()=>{
+ const s=applyCampaignEvent(freshState(),{id:'p',type:'party',member:'zell',name:'Zell'}).state;
+ const url='data:image/jpeg;base64,/9j/AA==';
+ assert.equal(validateCampaign(setPortrait(s,'zell',url)).party[0].portrait,url);
+ assert.throws(()=>setPortrait(s,'zell','data:image/svg+xml;base64,AAAA'));
+ assert.throws(()=>setPortrait(s,'zell','data:image/jpeg;base64,'+'A'.repeat(180000)));
+});
