@@ -1,0 +1,14 @@
+{
+  "display_name": "FFVIII • Garden",
+  "loading_order": 50,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "Mr OMG & Codex",
+  "version": "0.1.0",
+  "minimum_client_version": "1.19.0",
+  "auto_update": false,
+  "generate_interceptor": "ff8GardenIntercept",
+  "homePage": "https://github.com/Caged1994/SillyTavern-FFVIII-Garden"
+}
