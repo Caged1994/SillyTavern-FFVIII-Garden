@@ -1,4 +1,4 @@
-# FFVIII • Garden — 0.2.0
+# FFVIII • Garden — 0.3.1
 
 A SillyTavern UI extension with blue menus and silver borders, the active Persona as protagonist, Guardian Forces, magic stocks, manual Junctions, inventory, and an event log. The center panel remains SillyTavern's native chat.
 
@@ -47,7 +47,7 @@ Example compatible response:
 Vesper, a silver moth-like GF, descends from the library ceiling. For now, it simply watches you.
 
 ```garden-event
-{"id":"vesper-encounter-001","type":"gf_discover","gf":"vesper","name":"Vesper","description":"A silver moth that guards dreams.","element":"Non-elemental","abilities":["j_hp","j_mag","j_spr","mag20","magic","draw","item","summon"]}
+{"type":"gf_discover","gf":"vesper","name":"Vesper","description":"A silver moth that guards dreams.","element":"Non-elemental","abilities":["j_hp","j_mag","j_spr","mag20","magic","draw","item","summon"]}
 ```
 ````
 
@@ -55,11 +55,13 @@ Later acquisition:
 
 ````text
 ```garden-event
-{"id":"vesper-pact-002","type":"gf_acquire","gf":"vesper"}
+{"type":"gf_acquire","gf":"vesper"}
 ```
 ````
 
-Also supported: `magic`, `item`, `gil`, `hp`, and `ap` events. Unique event IDs prevent duplicate application. Invalid events are rejected with a message. A batch is only applied if every new event is valid.
+Also supported: `magic`, `item`, `gil`, `hp`, and `ap` events. An `id` is optional: Garden scopes every event to the response and swipe it came from, so reading the same response twice never applies it twice, while a later response may reuse an ID freely. Invalid events are rejected with a message naming the event (for example `Event 2 (magic): Unknown magic.`). A batch is only applied if every new event is valid.
+
+Garden tolerates common small-model mistakes: trailing commas, typographic quotes, one object per line, a missing closing fence, and blocks fenced as `json` (or unlabelled) when every object is a Garden event. Other code blocks in the story are left alone. Event blocks are removed from the copy of the chat sent to the model, so it never sees or repeats earlier blocks; your chat history keeps them.
 
 **Apply AI events after each response** is enabled initially. Disable it if you prefer to inspect a response and press **Read latest response events** yourself. Event blocks appear in collapsible **Garden events** sections when the Garden layout is active. The original message text is preserved. If your model ignores the protocol, you can still update resources and register GFs through the menus.
 
@@ -123,7 +125,7 @@ The integration was checked against SillyTavern 1.19.0 source commit `06bde939f`
 - Official extension documentation: https://docs.sillytavern.app/for-contributors/writing-extensions/
 - SillyTavern source: https://github.com/SillyTavern/SillyTavern/tree/06bde939f
 
-Run `npm test` with Node; engine tests require no dependencies. For the menu integration suite, run `npm ci` followed by `npm run test:ui` (jsdom is a development dependency only; installation in SillyTavern needs no npm packages). Engine tests and menu interactions with simulated SillyTavern APIs cover Junctions, AP, Persona separation, persistence, events, duplicates, undo, migration, party resources, mission rewards, conditions, equipment, permissions, response restoration and disabling. Full browser visual verification was unavailable in the development environment. Compatibility with your installed themes, extensions, and online model still requires a real installation test.
+Run `npm test` with Node; engine tests require no dependencies. The menu integration suite (`tests/ui-suite.js`) has two runners: `npm ci` followed by `npm run test:ui` runs it in jsdom, and `npm run test:browser` runs it in a real Chromium page through Playwright (installed separately; `SCREENSHOTS=1` saves screenshots to `tests/screenshots/`). Installation in SillyTavern needs no npm packages. Engine tests and menu interactions with simulated SillyTavern APIs cover Junctions, AP, Persona separation, persistence, events, duplicates, undo, migration, party resources, mission rewards, conditions, equipment, permissions, response restoration and disabling. Compatibility with your installed themes, extensions, and online model still requires a real installation test.
 
 Unofficial fan project. Original code is licensed under MIT. Final Fantasy and related names belong to their respective rights holders.
 
@@ -144,3 +146,10 @@ Use **Guardian Force → Add a GF from the FFVIII catalog** to register a canoni
 Evasion now supports basic stat Junctions, and Ability x3 / x4 expand the available character passive slots. Element/status Junctions, summon modifiers, refinement, and most special battle effects are reference entries for narration rather than fully automated mechanics. Catalog availability does not grant free magic stocks or automatically learned AP abilities.
 
 Catalog fact references: [FFOnline abilities](https://ffonline.com/ff8/abilities), [FFOnline magic](https://ffonline.com/ff8/magic), and [Final Fantasy Wiki magic list](https://finalfantasy.fandom.com/wiki/Magic_(Final_Fantasy_VIII)).
+
+### v0.3.1 — Lighter saves, scoped event IDs and a slimmer prompt
+
+- **Saves:** uploaded portraits are stored once per chat and referenced by key, and each response timeline entry stores only what that response changed. With three companions with portraits, chat metadata drops from about 16.6 MB to about 0.2 MB in the worst case. Existing saves are converted on the next change. Exports still contain the images.
+- **Event IDs:** IDs are scoped per response and swipe instead of globally, so a model that reuses an ID such as `reward-1` in a later response no longer loses that event silently. Seen-event lists are trimmed instead of blocking at 5000.
+- **Prompt:** the per-turn prompt sends only owned magic and items, GF summaries and active missions, and no longer includes the full 115-ability catalog. With the test kit and three companions it drops from about 2,800 to about 1,300 tokens. Disabled AI permissions are listed only when present.
+- **Parser:** see *Narration and original GFs* for the tolerated formats and the outgoing cleanup.

@@ -1,65 +1,12 @@
-const {JSDOM}=require('jsdom');const fs=require('node:fs');const path=require('node:path');const os=require('node:os');const {pathToFileURL}=require('node:url');const assert=require('node:assert/strict');
+// jsdom runner for tests/ui-suite.js. Requires `npm ci` (jsdom is a dev dependency only).
+const {JSDOM}=require('jsdom');const fs=require('node:fs');const path=require('node:path');const os=require('node:os');const {pathToFileURL}=require('node:url');
 (async()=>{
  const dom=new JSDOM(fs.readFileSync(path.join(__dirname,'ui-fixture.html'),'utf8'),{url:'http://localhost:8765/qa/harness.html',runScripts:'dangerously'});const w=dom.window;
- Object.assign(global,{window:w,document:w.document,SillyTavern:w.SillyTavern,FormData:w.FormData,URL:w.URL});w.confirm=()=>true;const d=w.document;
+ Object.assign(global,{window:w,document:w.document,SillyTavern:w.SillyTavern,FormData:w.FormData,URL:w.URL});
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'garden-ui-'));const dest=path.join(temp,'public/scripts/extensions/third-party/garden');fs.mkdirSync(dest,{recursive:true});fs.writeFileSync(path.join(temp,'package.json'),'{"type":"module"}');for(const file of ['index.js','engine.js','campaign.js','catalog.js'])fs.copyFileSync(path.join(__dirname,'..',file),path.join(dest,file));fs.writeFileSync(path.join(temp,'public/scripts/personas.js'),"export let user_avatar='lucas.png';export function getUserAvatar(a){return 'User Avatars/'+a;}window.changeAvatar=a=>user_avatar=a;");
  await import(pathToFileURL(path.join(dest,'index.js')).href);
- async function waitFor(fn){for(let i=0;i<100;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('Timed out');}
- const click=async sel=>{const el=d.querySelector(sel);assert(el,'Missing '+sel);el.click();await new Promise(r=>setTimeout(r,5));};const submit=sel=>d.querySelector(sel).dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
- const profile=()=>w.context.chatMetadata.ff8_garden_v1?.profiles['p:lucas.png'];
- await waitFor(()=>d.querySelector('#garden-left h3'));assert.equal(d.querySelector('#garden-left h3').textContent,'Lucas');
- await click('[data-action="kit"]');await waitFor(()=>profile()?.state.gfs.length===2);
- await click('[data-stat="str"]');await click('[data-spell="fire"]');await click('[data-action="apply"]');await waitFor(()=>profile().state.junction.str==='fire');assert.equal(d.querySelector('tr:has([data-stat="str"]) td:last-child').textContent,'18');
- await click('[data-stat="hp"]');await click('[data-spell="cure"]');assert.match(d.querySelector('.garden-preview').textContent,/980/);await click('[data-action="cancel"]');assert.equal(profile().state.junction.hp,undefined);
- await click('[data-tab="gf"]');const training=d.querySelector('[data-training="shiva"]');training.value='j_vit';training.dispatchEvent(new w.Event('change',{bubbles:true}));await waitFor(()=>profile().state.gfs[0].training==='j_vit');await new Promise(r=>setTimeout(r,5));
- d.querySelector('[data-form="ap"] input').value=100;submit('[data-form="ap"]');await waitFor(()=>profile().state.gfs[0].learned.includes('j_vit'));await new Promise(r=>setTimeout(r,5));
- w.changeAvatar('other.png');await w.emit('persona');await click('[data-tab="junction"]');assert.equal(d.querySelector('tr:has([data-stat="str"]) td:last-child').textContent,'10');w.changeAvatar('lucas.png');await w.emit('persona');assert.equal(d.querySelector('tr:has([data-stat="str"]) td:last-child').textContent,'18');
- await w.emit('start');w.context.chat.push({is_user:false,mes:'```garden-event\n{"id":"reward-1","type":"gil","amount":100}\n```'});await w.emit('end');await waitFor(()=>profile().state.gil===100);await click('[data-action="latest"]');await new Promise(r=>setTimeout(r,30));assert.equal(profile().state.gil,100);
- await click('[data-action="undo"]');await waitFor(()=>profile().state.gil===0);await w.emit('start');await w.emit('end');await new Promise(r=>setTimeout(r,30));assert.equal(profile().state.gil,0);
- w.context.chat.push({is_user:false,mes:'```garden-event\n[{"id":"good","type":"gil","amount":99},{"id":"bad","type":"magic","magic":"bad","amount":5}]\n```'});await click('[data-action="latest"]');await new Promise(r=>setTimeout(r,30));assert.equal(profile().state.gil,0);
- const persisted=JSON.parse(w.localStorage.getItem('qa-metadata'));assert.equal(persisted.ff8_garden_v1.profiles['p:lucas.png'].state.junction.str,'fire');
- for(const tab of ['status','magic','gf','inventory','events','junction']){await click('[data-tab="'+tab+'"]');assert(!/Scorte di magie|Usa|Apprendimento|Equipaggia|Statistica|Annulla|attivi|disattivati/.test(d.querySelector('#garden-right').textContent),'Untranslated tab '+tab);}
-
- // New campaign menus and automatic alternative-response restoration.
- w.context.chat.pop(); // Remove the deliberately invalid response.
- await click('[data-tab="party"]');d.querySelector('[name="member"]').value='zell';d.querySelector('[data-form="party"] [name="name"]').value='Zell';submit('[data-form="party"]');await waitFor(()=>profile().state.party.length===1);await new Promise(r=>setTimeout(r,10));
- const member=d.querySelector('[data-member]');member.value='zell';member.dispatchEvent(new w.Event('change',{bubbles:true}));await click('[data-tab="magic"]');d.querySelector('[name="amount"]').value=25;submit('[data-form="magic"]');await waitFor(()=>profile().state.party[0].state.magic.fire===25);assert.equal(profile().state.magic.fire,80);await new Promise(r=>setTimeout(r,10));
- d.querySelector('[data-member]').value='protagonist';d.querySelector('[data-member]').dispatchEvent(new w.Event('change',{bubbles:true}));
- await w.emit('start');w.context.chat.push({is_user:false,swipe_id:0,mes:'```garden-event\n{"id":"swipe-a","type":"gil","amount":50}\n```'});await w.emit('end');await waitFor(()=>profile().state.gil===50);await new Promise(r=>setTimeout(r,10));
- await click('[data-tab="magic"]');d.querySelector('[name="amount"]').value=10;submit('[data-form="magic"]');await waitFor(()=>profile().state.magic.fire===90);await new Promise(r=>setTimeout(r,10));
- w.context.chat.at(-1).swipe_id=1;w.context.chat.at(-1).mes='```garden-event\n{"id":"swipe-b","type":"gil","amount":20}\n```';await w.emit('swipe');await waitFor(()=>profile().state.gil===20);assert.equal(profile().state.magic.fire,90);assert.equal(profile().state.junction.str,'fire');assert(!profile().state.seenEvents.includes('swipe-a'));await new Promise(r=>setTimeout(r,10));
- w.context.chat.at(-1).mes='No reward this time.';await w.emit('edit');await waitFor(()=>profile().state.gil===0);await new Promise(r=>setTimeout(r,10));
- await w.emit('start');w.context.chat.push({is_user:false,mes:'```garden-event\n{"id":"delete-reward","type":"gil","amount":30}\n```'});await w.emit('end');await waitFor(()=>profile().state.gil===30);await new Promise(r=>setTimeout(r,10));w.context.chat.pop();await w.emit('delete');await waitFor(()=>profile().state.gil===0);await new Promise(r=>setTimeout(r,10));
- await click('[data-tab="quests"]');const q=d.querySelector('[data-form="quest"]');q.querySelector('[name="quest"]').value='exam';q.querySelector('[name="title"]').value='SeeD exam';q.querySelector('[name="xp"]').value=1000;submit('[data-form="quest"]');await waitFor(()=>profile().state.quests.length===1);await new Promise(r=>setTimeout(r,10));await click('[data-action="complete"]');await waitFor(()=>profile().state.level===2);assert.equal(profile().state.party[0].state.level,2);assert(d.querySelector('[data-action="complete"]').disabled);
-
- // Older response edits replay later valid responses in order.
- await new Promise(r=>setTimeout(r,10));await w.emit('start');w.context.chat.push({is_user:false,mes:'```garden-event\n{"id":"older","type":"gil","amount":10}\n```'});await w.emit('end');await waitFor(()=>profile().state.gil===10);await new Promise(r=>setTimeout(r,10));const olderIndex=w.context.chat.length-1;
- await w.emit('start');w.context.chat.push({is_user:false,mes:'```garden-event\n{"id":"later","type":"gil","amount":15}\n```'});await w.emit('end');await waitFor(()=>profile().state.gil===25);await new Promise(r=>setTimeout(r,10));w.context.chat[olderIndex].mes='The old reward was cancelled.';await w.emit('edit');await waitFor(()=>profile().state.gil===15);await new Promise(r=>setTimeout(r,10));
- // Technical data is collapsed without changing message source.
- const node=d.createElement('div');node.className='mes';node.setAttribute('mesid',w.context.chat.length-1);node.innerHTML='<div class="mes_block"><div class="mes_text"><pre><code class="language-garden-event"></code></pre></div></div>';node.querySelector('code').textContent='{"id":"later","type":"gil","amount":15}';d.querySelector('#chat').append(node);const original=w.context.chat.at(-1).mes;await click('[data-tab="events"]');assert(node.querySelector('.garden-technical'));assert(node.querySelector('pre.garden-event-source'));assert.equal(w.context.chat.at(-1).mes,original);
- for(const tab of ['party','quests','scene'])await click('[data-tab="'+tab+'"]');
- w.context.name1='<img src=x onerror=alert(1)>';await w.emit('persona');assert.equal(d.querySelector('#garden-left h3 img'),null);assert.equal(d.querySelector('#garden-left h3').textContent,w.context.name1);
- await click('[data-tab="party"]');
- d.querySelector('[data-form="portrait"] [name="portrait"]').value='https://example.com/zell.png';submit('[data-form="portrait"]');await waitFor(()=>profile().state.party[0].portrait==='https://example.com/zell.png');await new Promise(r=>setTimeout(r,10));
- d.querySelector('select[data-member]').value='zell';d.querySelector('select[data-member]').dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(d.querySelector('#garden-left h3').textContent,'Zell');assert.equal(d.querySelector('#garden-left .garden-profile img').src,'https://example.com/zell.png');
- await click('[data-tab="catalog"]');assert.equal(d.querySelectorAll('[data-catalog-entry]').length,188);const search=d.querySelector('[data-catalog-search]');search.value='Bahamut';search.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(d.querySelectorAll('[data-catalog-entry]:not([hidden])').length,1);
- await click('[data-tab="gf"]');d.querySelector('[data-form="canonical-gf"] [name="gf"]').value='bahamut';d.querySelector('[data-form="canonical-gf"] [name="acquired"]').checked=true;submit('[data-form="canonical-gf"]');await waitFor(()=>profile().state.party[0].state.gfs.some(g=>g.id==='bahamut'));await new Promise(r=>setTimeout(r,10));assert(!profile().state.party[0].state.equipped.includes('bahamut'));assert.equal(profile().state.party[0].state.gfs.find(g=>g.id==='bahamut').abilities.length,22);
- await click('[data-tab="party"]');
- // Exercise the PC file picker through resize/encode and persisted portrait.
- const oldClick=w.HTMLInputElement.prototype.click;let picker;
- w.HTMLInputElement.prototype.click=function(){if(this.type==='file')picker=this;else oldClick.call(this);};
- const oldImage=global.Image;global.Image=class{constructor(){this.naturalWidth=800;this.naturalHeight=600;}async decode(){}};
- const oldContext=w.HTMLCanvasElement.prototype.getContext,oldData=w.HTMLCanvasElement.prototype.toDataURL;
- w.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},drawImage(){}});w.HTMLCanvasElement.prototype.toDataURL=function(type){assert.equal(this.width,384);assert.equal(this.height,288);assert.equal(type,'image/jpeg');return 'data:image/jpeg;base64,/9j/AA==';};
- w.URL.createObjectURL=()=> 'blob:portrait-test';w.URL.revokeObjectURL=()=>{};
- await click('[data-action="upload-portrait"]');assert(picker);Object.defineProperty(picker,'files',{value:[new w.File(['image'],'portrait.png',{type:'image/png'})]});picker.onchange();await waitFor(()=>profile().state.party[0].portrait==='data:image/jpeg;base64,/9j/AA==');await new Promise(r=>setTimeout(r,10));
- assert.equal(d.querySelector('#garden-left .garden-profile img').src,'data:image/jpeg;base64,/9j/AA==');
- await click('[data-action="clear-portrait"]');await waitFor(()=>profile().state.party[0].portrait==='');
- w.HTMLInputElement.prototype.click=oldClick;global.Image=oldImage;w.HTMLCanvasElement.prototype.getContext=oldContext;w.HTMLCanvasElement.prototype.toDataURL=oldData;
- await new Promise(r=>setTimeout(r,10));d.querySelector('[data-form="portrait"] [name="portrait"]').value='https://example.com/zell.png';submit('[data-form="portrait"]');await waitFor(()=>profile().state.party[0].portrait==='https://example.com/zell.png');await new Promise(r=>setTimeout(r,10));
- await click('[data-action="remove-member"]');await waitFor(()=>profile().state.party.length===0);assert.equal(d.querySelector('select[data-member]').value,'protagonist');
- await click('[data-action="undo"]');await waitFor(()=>profile().state.party.length===1);assert.equal(profile().state.party[0].portrait,'https://example.com/zell.png');
- await click('[data-action="disable"]');assert.equal(d.body.classList.contains('garden-active'),false);assert.equal(d.querySelector('#garden-bar').hidden,true);assert.equal(w.prompts.ff8_garden_v1,'');
- assert(!w.notices.some(t=>t.startsWith('ERROR:')&&!t.includes('Unknown magic')));console.log('PASS DOM: Junction apply/preview/cancel, AP, Persona avatar isolation, events, deduplication, undo, failed generation, atomic rejection, save, escaping, disable, party, missions, swipe/edit/delete restoration and manual edit protection.');dom.window.close();fs.rmSync(temp,{recursive:true,force:true});
+ const {run}=await import(pathToFileURL(path.join(__dirname,'ui-suite.js')).href);
+ await run({w,d:w.document,G:global});
+ console.log('PASS DOM (jsdom): Junction, AP, Persona isolation, events, scoped IDs, tolerant parsing, outgoing cleanup, diff timeline, undo, atomic rejection, save, escaping, party, missions, swipe/edit/delete restoration, portraits and disable.');
+ dom.window.close();fs.rmSync(temp,{recursive:true,force:true});
 })().catch(e=>{console.error(e);process.exitCode=1;});
-

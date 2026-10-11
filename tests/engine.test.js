@@ -32,8 +32,9 @@ test('Stock depletion removes Junction; quantities cap at 100',()=>{
  let s=freshState();starterKit(s);setJunction(s,'str','fire');s=applyEvent(s,{id:'use',type:'magic',magic:'fire',amount:-100}).state;assert.equal(s.junction.str,undefined);
  s=applyEvent(s,{id:'draw',type:'magic',magic:'fire',amount:100}).state;s=applyEvent(s,{id:'draw2',type:'magic',magic:'fire',amount:50}).state;assert.equal(s.magic.fire,100);
 });
-test('Fenced protocol parses only marked blocks and rejects malformed JSON',()=>{
- assert.equal(parseEvents('```json\n{"type":"gil"}\n```').length,0);
+test('Fenced protocol parses Garden blocks, ignores unrelated JSON and rejects malformed JSON',()=>{
+ assert.equal(parseEvents('```json\n{"name":"Squall","type":"profile"}\n```').length,0);
+ assert.equal(parseEvents('```json\n{"type":"gil","amount":5}\n```').length,1);
  assert.equal(parseEvents('Story\n```garden-event\n[{"id":"x","type":"gil","amount":3}]\n```')[0].amount,3);
  assert.throws(()=>parseEvents('```garden-event\n{wrong}\n```'));
 });
