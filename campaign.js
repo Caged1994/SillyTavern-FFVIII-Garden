@@ -1,4 +1,4 @@
-import {freshState,validateState,applyEvent,values,reconcile,STATS} from './engine.js';
+import {freshState,validateState,applyEvent,values,reconcile,STATS,SEEN_LIMIT,owned,gfSummary} from './engine.js';
 const copy=x=>structuredClone(x);
 const text=(v,max=300)=>{if(typeof v!=='string'||!v.trim()||v.length>max)throw Error('Invalid text.');return v.trim();};
 const ident=v=>{v=text(v,64);if(!/^[a-z0-9][a-z0-9_-]*$/i.test(v))throw Error('Invalid ID.');return v;};
@@ -48,7 +48,7 @@ export function applyCampaignEvent(input,e,permissions=null){
  case 'memory':{const m={id:ident(e.memory),npc:text(e.npc,80),text:text(e.text,500),important:e.important===true};const old=s.memories.findIndex(x=>x.id===m.id);if(old<0)s.memories.push(m);else s.memories[old]=m;s.memories=s.memories.slice(-100);break;}
  case 'scene':{if(!Array.isArray(e.present)||e.present.length>20)throw Error('Invalid scene roster.');s.scene={location:text(e.location,120),time:text(e.time,80),day:num(e.day,1,99999),present:e.present.map(x=>text(x,80)),mission:typeof e.mission==='string'?e.mission.slice(0,100):''};break;}
  }
- if(!s.seenEvents.includes(e.id))s.seenEvents.push(e.id);if(s.seenEvents.length>5000)throw Error('Event limit reached.');if(!['hp','magic','item','gil','ap','gf_discover','gf_acquire'].includes(e.type)||c!==s){s.log.unshift({at:new Date().toISOString(),text:`${e.type}: ${e.target||'protagonist'}`});s.log=s.log.slice(0,100);}return {state:s,duplicate:false};
+ if(!s.seenEvents.includes(e.id))s.seenEvents.push(e.id);s.seenEvents=s.seenEvents.slice(-SEEN_LIMIT);if(!['hp','magic','item','gil','ap','gf_discover','gf_acquire'].includes(e.type)||c!==s){s.log.unshift({at:new Date().toISOString(),text:`${e.type}: ${e.target||'protagonist'}`});s.log=s.log.slice(0,100);}return {state:s,duplicate:false};
 }
 export function validateCampaign(input){
  const s=campaign(validateState(input));
@@ -61,15 +61,62 @@ export function validateCampaign(input){
  if(new Set(s.quests.map(q=>q.id)).size!==s.quests.length||new Set(s.memories.map(m=>m.id)).size!==s.memories.length)throw Error('Duplicate mission or memory IDs.');
  return s;
 }
+// Array items are matched by id when they have one, otherwise by content (same rule as reverseChanges).
+export const itemKey=x=>typeof x==='object'&&x!==null?(x.id??JSON.stringify(x)):JSON.stringify(x);
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
+function prune(before,after){
+ if(Array.isArray(before)&&Array.isArray(after)){
+  const b=[],a=[];
+  for(const x of after){const k=itemKey(x),y=before.find(v=>itemKey(v)===k);if(y===undefined)a.push(x);else if(!same(x,y)){const [pb,pa]=prune(y,x);b.push(plain(y)&&y.id!==undefined?{id:y.id,...pb}:pb);a.push(plain(x)&&x.id!==undefined?{id:x.id,...pa}:pa);}}
+  for(const y of before)if(!after.some(v=>itemKey(v)===itemKey(y)))b.push(y);
+  return [b,a];
+ }
+ if(plain(before)&&plain(after)){
+  const b={},a={};
+  for(const k of new Set([...Object.keys(before),...Object.keys(after)])){
+   if(same(before[k],after[k]))continue;
+   const x=before[k],y=after[k];
+   if(x!==null&&y!==null&&typeof x==='object'&&typeof y==='object'&&Array.isArray(x)===Array.isArray(y)){[b[k],a[k]]=prune(x,y);}
+   else{if(Object.hasOwn(before,k))b[k]=x;if(Object.hasOwn(after,k))a[k]=y;}
+  }
+  return [b,a];
+ }
+ return [before,after];
+}
+// Keeps only what a response changed. reverseChanges gives the same result with this pair as with the full states,
+// so each timeline entry stores a few hundred bytes instead of two complete saves.
+export function diffStates(before,after){const [b,a]=prune(before,after);return copy({before:b,after:a});}
+
+// Uploaded portraits are stored once per chat and referenced by key, so Undo and timeline snapshots stay small.
+export const ASSET_PREFIX='asset:';
+function hashText(s){let h1=0xdeadbeef^s.length,h2=0x41c6ce57^s.length;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);h1=Math.imul(h1^c,2654435761);h2=Math.imul(h2^c,1597334677);}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return (h2>>>0).toString(36)+(h1>>>0).toString(36);}
+export function internPortraits(state,assets){
+ for(const m of Array.isArray(state?.party)?state.party:[]){
+  if(typeof m?.portrait!=='string'||!m.portrait.startsWith('data:'))continue;
+  let key=hashText(m.portrait);while(Object.hasOwn(assets,key)&&assets[key]!==m.portrait)key+='x';
+  assets[key]=m.portrait;m.portrait=ASSET_PREFIX+key;
+ }
+ return state;
+}
+export function portraitSource(value,assets){return typeof value==='string'&&value.startsWith(ASSET_PREFIX)?(assets?.[value.slice(ASSET_PREFIX.length)]||''):(value||'');}
+export function inlinePortraits(state,assets){const s=copy(state);for(const m of s.party||[])if(m.portrait!==undefined)m.portrait=portraitSource(m.portrait,assets);return s;}
+export function assetRefs(state,refs=new Set()){for(const m of Array.isArray(state?.party)?state.party:[])if(typeof m?.portrait==='string'&&m.portrait.startsWith(ASSET_PREFIX))refs.add(m.portrait.slice(ASSET_PREFIX.length));return refs;}
+
 // Reverse only values still equal to the AI's result, preserving subsequent manual edits.
 export function reverseChanges(current,before,after){
  if(JSON.stringify(current)===JSON.stringify(after))return copy(before);
  if(Array.isArray(current)&&Array.isArray(before)&&Array.isArray(after)){
- const key=x=>typeof x==='object'&&x!==null?(x.id??JSON.stringify(x)):JSON.stringify(x);
+ const key=itemKey;
  const result=copy(current);for(const a of after){const k=key(a),b=before.find(x=>key(x)===k),i=result.findIndex(x=>key(x)===k);if(b===undefined&&i>=0&&JSON.stringify(result[i])===JSON.stringify(a))result.splice(i,1);else if(b!==undefined&&i>=0)result[i]=reverseChanges(result[i],b,a);}for(const b of before)if(!after.some(x=>key(x)===key(b))&&!result.some(x=>key(x)===key(b)))result.push(copy(b));return result;
  }
  if(!current||!before||!after||typeof current!=='object')return copy(current);
  const result=copy(current);for(const key of new Set([...Object.keys(before),...Object.keys(after)])){if(JSON.stringify(before[key])===JSON.stringify(after[key]))continue;if(JSON.stringify(current[key])===JSON.stringify(after[key])){if(before[key]===undefined)delete result[key];else result[key]=copy(before[key]);}else if(current[key]&&before[key]&&after[key]&&typeof current[key]==='object')result[key]=reverseChanges(current[key],before[key],after[key]);}return result;
 }
-export function campaignPrompt(s){return `\nGARDEN CAMPAIGN: ${JSON.stringify({party:s.party.map(m=>({id:m.id,name:m.name,level:m.state.level,xp:m.state.xp,hp:m.state.hp,stats:effective(m.state),magic:m.state.magic,junction:m.state.junction,gfs:m.state.gfs,equipped:m.state.equipped,conditions:m.state.conditions,items:m.state.items,gear:m.state.gear})),quests:s.quests,scene:s.scene,conditions:s.conditions,equipment:s.gear,xp:s.xp,memories:s.memories.filter(m=>m.important||s.scene.present.includes(m.npc)).slice(-20)})}\nAdditional events (unique id required): party {member,name}; xp {amount,target}; condition {condition,turns,target} (0 removes); tick {turns,target} only when turns actually pass; equipment {gear,name,kind,quantity,bonuses} registers backpack items, never equip them; quest {quest,title,kind,progress,reward:{xp,gil,ap}}; quest_complete {quest} rewards once; memory {memory,npc,text,important}; scene {location,time,day,present:[names],mission}. Add type and id to each object. Optional target is protagonist or a party ID. XP: 1000 per level; +30 base HP and +1 STR/VIT/MAG/SPR per level, cap100. Poison deals 1/16 maximum HP per tick; Haste doubles effective Speed. Sleep/Silence prevent corresponding narrative actions; Protect/Shell are descriptive damage guards, not automatic combat damage calculators. Never change Junctions, equipped GF, passive abilities or equipment loadout. User manages those. GF AP stays separate from character XP.`;}
+const gearSummary=gear=>(gear||[]).map(g=>({id:g.id,name:g.name,kind:g.kind,quantity:g.quantity,...(g.equipped?{equipped:true}:{}),...(Object.keys(owned(g.bonuses)).length?{bonuses:owned(g.bonuses)}:{})}));
+export function campaignPrompt(s){
+ const active=s.quests.filter(q=>!q.completed),done=s.quests.filter(q=>q.completed).map(q=>q.title);
+ const data={party:s.party.map(m=>({id:m.id,name:m.name,level:m.state.level,xp:m.state.xp,hp:m.state.hp,stats:effective(m.state),magic:owned(m.state.magic),junction:m.state.junction,gfs:gfSummary(m.state),conditions:m.state.conditions,items:owned(m.state.items),gear:gearSummary(m.state.gear)})),quests:active,...(done.length?{completedQuests:done}:{}),scene:s.scene,conditions:s.conditions,equipment:gearSummary(s.gear),xp:s.xp,memories:s.memories.filter(m=>m.important||s.scene.present.includes(m.npc)).slice(-20)};
+ return `\nGARDEN CAMPAIGN: ${JSON.stringify(data)}\nMore event types: party {member,name}; xp {amount}; condition {condition,turns} (0 removes); tick {turns} only when turns pass; equipment {gear,name,kind,quantity,bonuses} adds backpack items, never equips; quest {quest,title,kind,progress,reward:{xp,gil,ap}}; quest_complete {quest}; memory {memory,npc,text,important}; scene {location,time,day,present:[names],mission}. Optional target: protagonist or a party ID. 1000 XP per level. Poison removes 1/16 max HP per tick; Haste doubles Speed; Sleep/Silence block matching actions; Protect/Shell are descriptive only. Never change Junctions, equipped GFs, abilities or equipment loadout.`;
+}
 

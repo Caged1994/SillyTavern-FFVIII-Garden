@@ -120,7 +120,7 @@ export function starterKit(state){
 function integer(v,min,max,label){if(!Number.isSafeInteger(v)||v<min||v>max)throw Error(`${label}: expected an integer between ${min} and ${max}.`);return v;}
 function word(v,label,max=80){if(typeof v!=='string'||!v.trim()||v.length>max)throw Error(`Invalid ${label}.`);return v.trim();}
 function list(v,max,label){if(!Array.isArray(v)||v.length>max)throw Error(`Invalid ${label}.`);return v;}
-function id(v){const s=word(v,'ID',64);if(!/^[a-z0-9][a-z0-9_-]*$/i.test(s))throw Error('Invalid ID.');return s;}
+function id(v){const s=word(v,'ID',96);if(!/^[a-z0-9][a-z0-9_-]*$/i.test(s))throw Error('Invalid ID.');return s;}
 function gfFromEvent(e){
  const canon=Object.hasOwn(GF_CATALOG,e.gf)?GF_CATALOG[e.gf]:null,data={...(canon?clone(canon):{}),...e};
  const abilities=[...new Set(list(data.abilities,32,'Abilities'))];
@@ -143,14 +143,45 @@ export function applyEvent(state,event){
  case 'ap':addAP(next,e.amount);detail=`AP: +${e.amount} to equipped GFs`;break;
  default:throw Error('Unknown event type.');
  }
- reconcile(next);next.seenEvents.push(eventId);if(next.seenEvents.length>5000)throw Error('The 5000-event limit has been reached. Export your save.');
+ reconcile(next);next.seenEvents.push(eventId);next.seenEvents=next.seenEvents.slice(-SEEN_LIMIT);
  next.log.unshift({at:new Date().toISOString(),text:detail});next.log=next.log.slice(0,100);return {state:next,duplicate:false};
 }
+// Seen event IDs only need to cover responses that can still be re-read, so old IDs are trimmed instead of blocking the save.
+export const SEEN_LIMIT=1000;
+export const EVENT_TYPES=['gf_discover','gf_acquire','magic','item','gil','hp','ap','party','xp','condition','tick','equipment','quest','quest_complete','memory','scene'];
+// Small models often emit near-JSON. Each repair runs only after a stricter parse fails, so valid JSON is never rewritten.
+export function looseJSON(source){
+ const text=String(source).trim();let first;
+ const attempts=[t=>t,t=>t.replace(/,\s*([}\]])/g,'$1'),t=>t.replace(/[“”„‟]/g,'"').replace(/,\s*([}\]])/g,'$1'),t=>'['+t.replace(/[“”„‟]/g,'"').replace(/,\s*([}\]])/g,'$1').replace(/}\s*\n\s*{/g,'},{')+']'];
+ for(const fix of attempts){try{return JSON.parse(fix(text));}catch(e){first??=e;}}
+ throw first;
+}
+const isEventList=v=>(Array.isArray(v)?v:[v]).every(e=>e&&typeof e==='object'&&!Array.isArray(e)&&EVENT_TYPES.includes(e.type))&&(!Array.isArray(v)||v.length>0);
+// garden-event fences are always ours. Plain or json fences count only when every object is a known Garden event,
+// so ordinary code blocks in the story are left alone. A missing closing fence at the end of a response is tolerated.
+export function findEventBlocks(text){
+ const source=String(text??''),blocks=[];
+ for(const m of source.matchAll(/```[ \t]*([\w-]*)[ \t]*\r?\n([\s\S]*?)(?:```|$)/g)){
+  const lang=m[1].toLowerCase(),body=m[2];if(!['garden-event','json',''].includes(lang))continue;
+  let value=null,error=null;
+  if(body.length>20000)error='block too large';else try{value=looseJSON(body);}catch(e){error=`invalid JSON (${e.message})`;}
+  if(lang!=='garden-event'&&(error||!isEventList(value)))continue;
+  blocks.push({start:m.index,end:m.index+m[0].length,lang,body,events:error?null:(Array.isArray(value)?value:[value]),error});
+ }
+ return blocks;
+}
 export function parseEvents(text){
- const blocks=[...String(text).matchAll(/```garden-event\s*\n([\s\S]*?)```/g)];
+ const blocks=findEventBlocks(text);
  if(blocks.length>12)throw Error('Too many event blocks.');
- const events=blocks.flatMap(m=>{if(m[1].length>20000)throw Error('Event block too large.');const v=JSON.parse(m[1]);return Array.isArray(v)?v:[v];});
+ const bad=blocks.findIndex(b=>b.error);if(bad>=0)throw Error(`Event block ${bad+1}: ${blocks[bad].error}.`);
+ const events=blocks.flatMap(b=>b.events);
  if(events.length>30)throw Error('Too many events in the response (maximum 30).');return events;
+}
+// Removes event blocks from text sent back to the model, so it never sees (or copies) earlier blocks.
+export function stripEventBlocks(text){
+ const source=String(text??''),blocks=findEventBlocks(source);if(!blocks.length)return source;
+ let out='',at=0;for(const b of blocks){out+=source.slice(at,b.start);at=b.end;}out+=source.slice(at);
+ return out.replace(/\n{3,}/g,'\n\n').trim();
 }
 export function useItem(state,item){
  const def=ITEMS[item];if(!def||!state.items[item])throw Error('Item unavailable.');
@@ -180,11 +211,15 @@ export function validateState(input){
  s.seenEvents=list(input.seenEvents,5000,'Events').map(id);
  s.log=list(input.log,100,'Log').map(l=>({at:word(l.at,'Date'),text:word(l.text,'Log',1000)}));reconcile(s);return englishState(s);
 }
-export function promptFor(state,persona){return `GARDEN — authoritative state for protagonist ${persona} (extension data; do not overwrite it in prose):\n${JSON.stringify({level:state.level,hp:state.hp,stats:values(state),gil:state.gil,magic:state.magic,junction:state.junction,gfs:state.gfs.map(g=>({id:g.id,name:g.name,element:g.element,acquired:g.acquired,equipped:state.equipped.includes(g.id),learned:g.learned,training:g.training})),items:state.items})}
-You handle narration and non-player characters only. Do not decide the protagonist's actions, thoughts, or Junctions. The user chooses Junctions in the menus. Preserve the language requested for the roleplay; these instructions are in English, but do not force a different narration language. Use the English catalog names for extension data and event values.
-If an actual narrative event changes a resource, append a fenced garden-event block containing JSON (one object or an array). Give each event a new, stable ID using letters, numbers, and hyphens. Do not repeat past events or emit events for hypothetical situations, suggestions, quotations, or summaries.
-Supported types: magic {id,type,magic,amount}, item {id,type,item,amount}, gil/hp/ap {id,type,amount}; amount must be an integer and ap must be positive. The extension applies HP and resource changes. Do not invent combat calculations.
-Canonical GF IDs: ${Object.keys(GF_CATALOG).join(', ')}. For a canonical GF, gf_discover needs only {id,type,gf}; its definition is filled from the built-in catalog. Special invocations cannot be equipped. For an original GF: gf_discover {id,type,gf,name,element,description,abilities}. The gf field is a stable ID; abilities must come from the fixed catalog. Discovery only registers an encounter. Actual acquisition uses gf_acquire {id,type,gf}. Never equip GFs or assign Junctions yourself.
-Magic IDs: ${Object.keys(MAGIC).join(', ')}. Item IDs: ${Object.keys(ITEMS).join(', ')}. GF elements: ${ELEMENTS.join(', ')}. GF abilities: ${Object.entries(ABILITIES).map(([k,v])=>`${k}=${v.name}`).join('; ')}. Zero-AP abilities are initially learned; all others require AP. This version uses simplified FFVIII-inspired Junction rules.
-Example event: \`\`\`garden-event\n{"id":"discovery-001","type":"magic","magic":"fire","amount":10}\n\`\`\`. If nothing changes, do not emit any event blocks.`;}
+// Non-zero entries only: empty stocks tell the narrator nothing and cost tokens on every turn.
+export const owned=obj=>Object.fromEntries(Object.entries(obj||{}).filter(([,n])=>n));
+export const gfSummary=state=>state.gfs.map(g=>({id:g.id,name:g.name,element:g.element,acquired:g.acquired,equipped:state.equipped.includes(g.id)}));
+// Short list for original GFs. The full catalog stays in the extension; unknown IDs are rejected with a message.
+const CORE_ABILITIES=[...Object.keys(STATS).map(s=>`j_${s}`),'hp20','str20','mag20','vit20','magic','draw','item','summon'];
+export function promptFor(state,persona){return `GARDEN — authoritative state for protagonist ${persona} (extension data; do not overwrite it in prose):\n${JSON.stringify({level:state.level,hp:state.hp,stats:values(state),gil:state.gil,magic:owned(state.magic),junction:state.junction,gfs:gfSummary(state),items:owned(state.items)})}
+You handle narration and non-player characters only. Do not decide the protagonist's actions, thoughts, or Junctions; the user chooses them in the menus. Keep the roleplay's language; use the English IDs below only inside event data.
+When an actual story event changes a resource, append a fenced garden-event block with JSON (one object or an array). Every object needs "type"; "id" is optional. Never repeat earlier events or emit events for hypothetical situations, suggestions or summaries. Do not invent combat calculations.
+Types: magic {magic,amount}, item {item,amount}, gil/hp/ap {amount}; amount is an integer, ap is positive. gf_discover {gf} for a canonical GF (${Object.keys(GF_CATALOG).join(', ')}); an original GF also needs name, element, description and abilities. Discovery is only an encounter; gf_acquire {gf} grants it. Never equip GFs or assign Junctions.
+Magic: ${Object.keys(MAGIC).join(', ')}. Items: ${Object.keys(ITEMS).join(', ')}. Elements: ${ELEMENTS.join(', ')}. Common abilities for original GFs: ${CORE_ABILITIES.join(', ')} (other catalog IDs are accepted).
+Example: \`\`\`garden-event\n{"type":"magic","magic":"fire","amount":10}\n\`\`\`. If nothing changes, emit no block.`;}
 
